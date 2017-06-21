@@ -1,0 +1,13 @@
+I think I have installed ipopt successfully following this post:
+
+Amit_Patel-1:
+For others with similar problem, I finally figured out. Basically need a fortran compiler (as @anthony-s said) and need to run the script provided by Udacity as a sudo user. So need to do both: sudo apt-get install gfortran sudo bash install_ipopt.sh Ipopt-3.12.7
+The commands needed: 
+sudo apt-get install gfortran
+sudo bash install_ipopt.sh Ipopt-3.12.7
+
+In my opinion, the issue is fixed by the following:
+1. download the tgz package instead of zip
+https://www.coin-or.org/download/source/Ipopt/Ipopt-3.12.7.tgz8
+2. use the sudo command
+3. install gfortran first

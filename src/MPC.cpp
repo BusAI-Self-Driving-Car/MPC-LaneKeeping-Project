@@ -5,9 +5,15 @@
 
 using CppAD::AD;
 
+double deg2rad(double x) { return x * pi() / 180; }
+double rad2deg(double x) { return x * 180 / pi(); }
+
 // TODO: Set the timestep length and duration
-size_t N = 0;
-double dt = 0;
+size_t N = 20;
+double dt = 0.01;
+
+// set reference speed
+double ref_v = 35;
 
 // This value assumes the model presented in the classroom is used.
 //
@@ -52,9 +58,33 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   // element vector and there are 10 timesteps. The number of variables is:
   //
   // 4 * 10 + 2 * 9
-  size_t n_vars = 0;
+  size_t n_state = 6; 
+  size_t n_input = 2;
+
+  size_t n_vars = n_state * N + n_input * (N-1);
   // TODO: Set the number of constraints
   size_t n_constraints = 0;
+
+  // Variables
+  double x = state[0];
+  double y = state[1];
+  double psi = state[2];
+  double v = state[3];
+  double cte = state[4];
+  double epsi = state[5];
+
+  // start index 설정(vars)
+  unsigned int x_start, y_start, psi_start, v_start, cte_start, epsi_start; // state
+  x_start = 0;
+  y_start = N;
+  psi_start = 2*N;
+  v_start = 3*N;
+  cte_start = 4*N;
+  epsi_start = 5*N;
+
+  unsigned int delta_start, a_start; // input
+  delta_start = 6*N;
+  a_start = delta_start + (N-1);
 
   // Initial value of the independent variables.
   // SHOULD BE 0 besides initial state.
@@ -63,9 +93,37 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
     vars[i] = 0;
   }
 
+  // Set the initial variable values
+  vars[x_start] = x;
+  vars[y_start] = y;
+  vars[psi_start] = psi;
+  vars[v_start] = v;
+  vars[cte_start] = cte;
+  vars[epsi_start] = epsi;
+
   Dvector vars_lowerbound(n_vars);
   Dvector vars_upperbound(n_vars);
   // TODO: Set lower and upper limits for variables.
+  double delta_limit = 25.0; // deg
+  double a_limit = 3.0; // m/s^2
+
+  // state boundary
+  for (int i=0; i<delta_start; i++){
+    vars_lowerbound[i] = -1.0e19;
+    vars_upperbound[i] = 1.0e19;
+  }
+
+  // delta boundary
+  for (int i=delta_start; i<a_start; i++){
+    vars_lowerbound[i] = - deg2rad(delta_limit);
+    vars_upperbound[i] = deg2rad(delta_limit);
+  }
+
+  // accel, decel boundary
+  for (int i=a_start; i<n_vars; i++){
+    vars_lowerbound[i] = -a_limit;
+    vars_upperbound[i] = a_limit;
+  }
 
   // Lower and upper limits for the constraints
   // Should be 0 besides initial state.
@@ -75,6 +133,20 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
     constraints_lowerbound[i] = 0;
     constraints_upperbound[i] = 0;
   }
+
+  constraints_lowerbound[x_start] = x;
+  constraints_lowerbound[y_start] = y;
+  constraints_lowerbound[psi_start] = psi;
+  constraints_lowerbound[v_start] = v;
+  constraints_lowerbound[cte_start] = cte;
+  constraints_lowerbound[epsi_start] = epsi;
+
+  constraints_upperbound[x_start] = x;
+  constraints_upperbound[y_start] = y;
+  constraints_upperbound[psi_start] = psi;
+  constraints_upperbound[v_start] = v;
+  constraints_upperbound[cte_start] = cte;
+  constraints_upperbound[epsi_start] = epsi;  
 
   // object that computes objective and constraints
   FG_eval fg_eval(coeffs);
@@ -117,5 +189,5 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   //
   // {...} is shorthand for creating a vector, so auto x1 = {1.0,2.0}
   // creates a 2 element double vector.
-  return {};
+  return {solution.x[delta_start],   solution.x[a_start]};
 }
