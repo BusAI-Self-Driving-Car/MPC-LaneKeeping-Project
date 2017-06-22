@@ -135,19 +135,26 @@ int main() {
           double* ptsy_ptr = &ptsy[0];
           Eigen::Map<Eigen::VectorXd> ptsy_(ptsy_ptr, ptsy.size());
 
+          // change the reference x,y coordinate from map's to vehicle's
           Eigen::VectorXd ptsx_local(ptsx.size());
-          Eigen::VectorXd ptsy_local(ptsy.size());
+          Eigen::VectorXd ptsy_local(ptsy.size()); 
           glob_to_local(ptsx_, ptsy_, psi, px, py, ptsx_local, ptsy_local);
 
+          // get third order polynomial lane parameters
           auto coeffs = polyfit(ptsx_local, ptsy_local, 3);
 
+          // set lookahead distance
+          double d_ahead = v * 0.15; 
+
           // state: cte, epsi
-          double cte = polyeval(coeffs, 0);
+          double cte = polyeval(coeffs, d_ahead);
           double epsi = - atan(coeffs[1]);
 
           Eigen::VectorXd state(6);
-          state << 0, 0, 0, v, cte, epsi;
+          state << d_ahead, 0, 0, v, cte, epsi;
 
+
+          // solve MPC!
           auto vars = mpc.Solve(state, coeffs);
 
           double steer_value;

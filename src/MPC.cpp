@@ -14,7 +14,7 @@ double dt = 0.05;
 
 // set reference speed
 double mph2mps = 0.44704; // mile/hour to m/s
-double ref_v = 100 * mph2mps;
+double ref_v = 90;
 
 // start index 설정(vars)
 // int x_start, y_start, psi_start, v_start, cte_start, epsi_start; // state
@@ -56,17 +56,17 @@ class FG_eval {
     fg[0] = 0;
 
     // weight for cost function
-    double w_cte = 100;
-    double w_epsi = 1000;
-    double w_v = 0.01;
+    double w_cte = 130;
+    double w_epsi = 1300;
+    double w_v = 0.005;
 
-    double w_delta = 0.1;
-    double w_a = 0;
+    double w_delta = 0.05;
+    double w_a = 0.01;
 
     double w_delta_diff = 0.5;
     double w_a_diff = 1;
 
-    double w_epsi_term = 3000;
+    double w_epsi_term = 1000;
 
     //**** cost function ****//
     // reference state
@@ -75,6 +75,8 @@ class FG_eval {
       fg[0] += CppAD::pow(vars[epsi_start + h], 2) * w_epsi;
       fg[0] += CppAD::pow(vars[v_start + h] - ref_v, 2) * w_v;
     }
+    
+    
 
     // minimize the use of actuator
     for(size_t h = 0; h < N-1; h++){
@@ -181,7 +183,7 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   double x = state[0];
   double y = state[1];
   double psi = state[2];
-  double v = state[3];
+  double v = state[3]; //mph
   double cte = state[4];
   double epsi = state[5];
 
