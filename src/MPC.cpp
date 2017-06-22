@@ -46,6 +46,9 @@ class FG_eval {
   // Fitted polynomial coefficients
   Eigen::VectorXd coeffs;
   FG_eval(Eigen::VectorXd coeffs) { this->coeffs = coeffs; }
+  double current_steer_;
+  double current_throttle_;
+
 
   typedef CPPAD_TESTVECTOR(AD<double>) ADvector;
   void operator()(ADvector& fg, const ADvector& vars) {
@@ -53,7 +56,6 @@ class FG_eval {
     // `fg` a vector of the cost constraints, `vars` is a vector of variable values (state & actuators)
     // NOTE: You'll probably go back and forth between this function and
     // the Solver function below.
-    fg[0] = 0;
 
     // weight for cost function
     double w_cte = 130;
@@ -69,6 +71,8 @@ class FG_eval {
     double w_epsi_term = 1000;
 
     //**** cost function ****//
+    fg[0] = 0;
+
     // reference state
     for(size_t h = 0; h < N; h++){
       fg[0] += CppAD::pow(vars[cte_start + h], 2) * w_cte;
@@ -126,9 +130,19 @@ class FG_eval {
       AD<double> cte0 = vars[cte_start + t - 1];
       AD<double> epsi0 = vars[epsi_start + t - 1];
 
-      // Only consider the actuation at time t.
-      AD<double> delta0 = vars[delta_start + t - 1];
-      AD<double> a0 = vars[a_start + t - 1];
+      // **** deal with actuator latency issues **** //
+      // Only consider the actuation at time t-2. (latency)
+      AD<double> delta0, a0;
+
+      if (t < 3){
+        delta0 = current_steer_;
+        a0 = current_throttle_;
+      }else{
+        delta0 = vars[delta_start + t - 3];
+        a0 = vars[a_start + t - 3];
+      }
+      // AD<double> delta0 = vars[delta_start + t - 1];
+      // AD<double> a0 = vars[a_start + t - 1];
 
       AD<double> f0 = coeffs[0] + coeffs[1] * x0 + coeffs[2] * x0 * x0 + coeffs[3] * x0 * x0 * x0;
       AD<double> psides0 = CppAD::atan(coeffs[1] + 2* coeffs[2] * x0 + 3*coeffs[3] * x0 * x0);
@@ -186,6 +200,10 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   double v = state[3]; //mph
   double cte = state[4];
   double epsi = state[5];
+
+  // additional current input
+  double delta_ = state[6]; // rad
+  double throttle_ = state[7]; // m/s^2
 
   // Initial value of the independent variables.
   // SHOULD BE 0 besides initial state.
@@ -250,6 +268,8 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
 
   // object that computes objective and constraints
   FG_eval fg_eval(coeffs);
+  fg_eval.current_steer_ = delta_;
+  fg_eval.current_throttle_ = throttle_;
 
   //
   // NOTE: You don't have to worry about these options

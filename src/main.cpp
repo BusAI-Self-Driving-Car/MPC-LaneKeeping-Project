@@ -126,6 +126,18 @@ int main() {
           double py = j[1]["y"];
           double psi = j[1]["psi"];
           double v = j[1]["speed"];
+          double steering_angle = j[1]["steering_angle"];
+          double throttle = j[1]["throttle"];
+
+          std::cout << "!!! steering angle : " << steering_angle << std::endl;
+          std::cout << "!!! throttle : " << throttle << std::endl;
+
+          double throttle_real;
+          if (throttle > 0){
+            throttle_real = throttle * 5;
+          }else{
+            throttle_real = throttle * 12;
+          }
 
           // The polynomial of lane center
           // cast std::vector to Eigen::VectorXd
@@ -150,8 +162,8 @@ int main() {
           double cte = polyeval(coeffs, d_ahead);
           double epsi = - atan(coeffs[1]);
 
-          Eigen::VectorXd state(6);
-          state << d_ahead, 0, 0, v, cte, epsi;
+          Eigen::VectorXd state(6+2);
+          state << d_ahead, 0, 0, v, cte, epsi, -steering_angle, throttle_real;
 
 
           // solve MPC!
@@ -211,7 +223,7 @@ int main() {
           //
           // NOTE: REMEMBER TO SET THIS TO 100 MILLISECONDS BEFORE
           // SUBMITTING.
-          this_thread::sleep_for(chrono::milliseconds(0));
+          this_thread::sleep_for(chrono::milliseconds(100));
           ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
         }
       } else {
