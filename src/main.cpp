@@ -65,6 +65,29 @@ Eigen::VectorXd polyfit(Eigen::VectorXd xvals, Eigen::VectorXd yvals,
   return result;
 }
 
+void glob_to_local(vector<double> x_glob, vector<double> y_glob, 
+                   double psi, double px, double py, 
+                   vector<double> &x_local, vector<double> &y_local){
+  
+  double cc = cos(psi);
+  double ss = sin(psi);
+  double x_local_, y_local_;
+  double x_diff_glob, y_diff_glob;
+
+  for(size_t i=0; i<x_glob.size(); i++){
+    x_diff_glob = x_glob[i] - px;
+    y_diff_glob = y_glob[i] - py;
+
+    x_local_ = x_diff_glob * cc + y_diff_glob * ss;
+    y_local_ = - x_diff_glob * ss + y_diff_glob * cc;
+
+    x_local[i] = x_local_;
+    y_local[i] = y_local_;
+  }
+
+
+}
+
 int main() {
   uWS::Hub h;
 
@@ -92,6 +115,10 @@ int main() {
           double psi = j[1]["psi"];
           double v = j[1]["speed"];
 
+          std::cout << "px: " << px << std::endl;
+          std::cout << "py: " << py << std::endl;
+          std::cout << "psi: " << psi << std::endl;
+
           // The polynomial of lane center
           // cast std::vector to Eigen::VectorXd
           double* ptsx_ptr = &ptsx[0];
@@ -103,7 +130,7 @@ int main() {
 
           // state: cte, epsi
           double cte = polyeval(coeffs, px) - py;
-          double epsi = psi - atan(coeffs[1]);
+          double epsi = psi - atan(coeffs[1] + 2* coeffs[2] * px + 3*coeffs[3] * px * px);
 
           Eigen::VectorXd state(6);
           state << px, py, psi, v, cte, epsi;
@@ -120,8 +147,9 @@ int main() {
           double throttle_value;
 
           steer_value = vars[0] / deg2rad(25.0); // normalize to [-1, 1]
-          throttle_value = vars[1] / 9.81; // normalized to [-1, 1]. simulator coversion이 이게 확실하진 않음
-
+          // throttle_value = vars[1] / 9.81; // normalized to [-1, 1]. simulator coversion이 이게 확실하진 않음
+          throttle_value = 0;
+          
           json msgJson;
           // NOTE: Remember to divide by deg2rad(25) before you send the steering value back.
           // Otherwise the values will be in between [-deg2rad(25), deg2rad(25)] instead of [-1, 1].
@@ -131,6 +159,8 @@ int main() {
           //Display the MPC predicted trajectory 
           vector<double> mpc_x_vals;
           vector<double> mpc_y_vals;
+          mpc_x_vals = {0,3,5,7,9,12};
+          mpc_y_vals = {0,0,0,0,0,0};
 
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Green line
@@ -139,8 +169,10 @@ int main() {
           msgJson["mpc_y"] = mpc_y_vals;
 
           //Display the waypoints/reference line
-          vector<double> next_x_vals;
-          vector<double> next_y_vals;
+          vector<double> next_x_vals (ptsx.size());
+          vector<double> next_y_vals (ptsy.size());
+          glob_to_local(ptsx, ptsy, psi, px, py, next_x_vals, next_y_vals);
+
 
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Yellow line

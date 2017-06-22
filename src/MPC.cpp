@@ -13,7 +13,7 @@ size_t N = 20;
 double dt = 0.01;
 
 // set reference speed
-double ref_v = 35;
+double ref_v = 25;
 
 // start index 설정(vars)
 // int x_start, y_start, psi_start, v_start, cte_start, epsi_start; // state
@@ -55,21 +55,22 @@ class FG_eval {
     fg[0] = 0;
 
     // weight for cost function
-    double w_epsi = 1;
+    double w_cte = 1;
+    double w_epsi = 0;
     double w_v = 1;
 
     double w_delta = 1;
-    double w_a = 1;
+    double w_a = 0;
 
-    double w_delta_diff = 1;
+    double w_delta_diff = 0.5;
     double w_a_diff = 1;
 
     //**** cost function ****//
     // reference state
     for(size_t h = 0; h < N; h++){
-      fg[0] += CppAD::pow(vars[cte_start + h], 2);
+      fg[0] += CppAD::pow(vars[cte_start + h], 2) * w_cte;
       fg[0] += CppAD::pow(vars[epsi_start + h], 2) * w_epsi;
-      fg[0] += CppAD::pow(vars[v_start + h], 2) * w_v;
+      fg[0] += CppAD::pow(vars[v_start + h] - ref_v, 2) * w_v;
     }
 
     // minimize the use of actuator
@@ -120,7 +121,7 @@ class FG_eval {
       AD<double> a0 = vars[a_start + t - 1];
 
       AD<double> f0 = coeffs[0] + coeffs[1] * x0;
-      AD<double> psides0 = CppAD::atan(coeffs[1]);
+      AD<double> psides0 = CppAD::atan(coeffs[1] + 2* coeffs[2] * x0 + 3*coeffs[3] * x0 * x0);
 
       // Here's `x` to get you started.
       // The idea here is to constraint this value to be 0.
@@ -194,8 +195,8 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   Dvector vars_lowerbound(n_vars);
   Dvector vars_upperbound(n_vars);
   // TODO: Set lower and upper limits for variables.
-  double delta_limit = 25.0; // deg
-  double a_limit = 3.0; // m/s^2
+  double delta_limit = 25 * 3.141592 / 180.0; // rad 25
+  double a_limit = 4.0; // m/s^2
 
   // state boundary
   for (size_t i=0; i<delta_start; i++){
@@ -205,14 +206,14 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
 
   // delta boundary
   for (size_t i=delta_start; i<a_start; i++){
-    vars_lowerbound[i] = - delta_limit * 3.141592 / 180.0;
-    vars_upperbound[i] = delta_limit * 3.141592 / 180.0;
+    vars_lowerbound[i] = - delta_limit;
+    vars_upperbound[i] = delta_limit;
   }
 
   // accel, decel boundary
   for (size_t i=a_start; i<n_vars; i++){
     vars_lowerbound[i] = -a_limit;
-    vars_upperbound[i] = a_limit;
+    vars_upperbound[i] = a_limit; // constant acceleartion
   }
 
   // Lower and upper limits for the constraints
@@ -272,12 +273,22 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
 
   // Cost
   auto cost = solution.obj_value;
+  std::cout << "-----------------------------" << std::endl;
   std::cout << "Cost " << cost << std::endl;
+  std::cout << "cte: " << state[4] << std::endl;
+  std::cout << "epsi: " << state[5] << std::endl;
 
   // TODO: Return the first actuator values. The variables can be accessed with
   // `solution.x[i]`.
   //
   // {...} is shorthand for creating a vector, so auto x1 = {1.0,2.0}
   // creates a 2 element double vector.
-  return {solution.x[delta_start],   solution.x[a_start]};
+  pred_x.clear();
+  pred_y.clear();
+  for (size_t i=0; i<N; i++){
+    pred_x.push_back(solution.x[x_start + i]);
+    pred_y.push_back(solution.x[y_start + i]);
+  }
+
+  return {solution.x[delta_start], solution.x[a_start]};
 }
