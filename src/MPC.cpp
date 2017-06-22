@@ -14,7 +14,7 @@ double dt = 0.05;
 
 // set reference speed
 double mph2mps = 0.44704; // mile/hour to m/s
-double ref_v = 90;
+double ref_v = 130;
 
 // start index 설정(vars)
 // int x_start, y_start, psi_start, v_start, cte_start, epsi_start; // state
@@ -58,9 +58,9 @@ class FG_eval {
     // the Solver function below.
 
     // weight for cost function
-    double w_cte = 130;
-    double w_epsi = 1300;
-    double w_v = 0.005;
+    double w_cte = 160;
+    double w_epsi = 1550;
+    double w_v = 0.0045;
 
     double w_delta = 0.05;
     double w_a = 0.01;
