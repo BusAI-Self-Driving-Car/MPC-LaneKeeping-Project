@@ -9,11 +9,11 @@ using CppAD::AD;
 // double rad2deg(double x) { return x * 180 / pi(); }
 
 // TODO: Set the timestep length and duration
-size_t N = 20;
-double dt = 0.01;
+size_t N = 40;
+double dt = 0.05;
 
 // set reference speed
-double ref_v = 25;
+double ref_v = 10;
 
 // start index 설정(vars)
 // int x_start, y_start, psi_start, v_start, cte_start, epsi_start; // state
@@ -55,8 +55,8 @@ class FG_eval {
     fg[0] = 0;
 
     // weight for cost function
-    double w_cte = 1;
-    double w_epsi = 0;
+    double w_cte = 10;
+    double w_epsi = 1;
     double w_v = 1;
 
     double w_delta = 1;
@@ -120,7 +120,7 @@ class FG_eval {
       AD<double> delta0 = vars[delta_start + t - 1];
       AD<double> a0 = vars[a_start + t - 1];
 
-      AD<double> f0 = coeffs[0] + coeffs[1] * x0;
+      AD<double> f0 = coeffs[0] + coeffs[1] * x0 + coeffs[2] * x0 * x0 + coeffs[3] * x0 * x0 * x0;
       AD<double> psides0 = CppAD::atan(coeffs[1] + 2* coeffs[2] * x0 + 3*coeffs[3] * x0 * x0);
 
       // Here's `x` to get you started.
@@ -196,7 +196,7 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   Dvector vars_upperbound(n_vars);
   // TODO: Set lower and upper limits for variables.
   double delta_limit = 25 * 3.141592 / 180.0; // rad 25
-  double a_limit = 4.0; // m/s^2
+  double a_limit = 3.0; // m/s^2
 
   // state boundary
   for (size_t i=0; i<delta_start; i++){

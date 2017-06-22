@@ -88,6 +88,16 @@ void glob_to_local(vector<double> x_glob, vector<double> y_glob,
 
 }
 
+void polyeval_vec(vector<double> ptsx, vector<double> ptsy, 
+                  Eigen::VectorXd coeffs, vector<double> &ptsy_poly){
+  double px, py;
+  for(size_t i=0; i<ptsx.size(); i++){
+    px = ptsx[i];
+    py = polyeval(coeffs, px);
+    ptsy_poly[i] = py;
+  }
+}
+
 int main() {
   uWS::Hub h;
 
@@ -100,7 +110,7 @@ int main() {
     // The 4 signifies a websocket message
     // The 2 signifies a websocket event
     string sdata = string(data).substr(0, length);
-    cout << sdata << endl;
+    // cout << sdata << endl;
     if (sdata.size() > 2 && sdata[0] == '4' && sdata[1] == '2') {
       string s = hasData(sdata);
       if (s != "") {
@@ -146,9 +156,12 @@ int main() {
           double steer_value;
           double throttle_value;
 
-          steer_value = vars[0] / deg2rad(25.0); // normalize to [-1, 1]
-          // throttle_value = vars[1] / 9.81; // normalized to [-1, 1]. simulator coversion이 이게 확실하진 않음
-          throttle_value = 0;
+          steer_value = - vars[0] / 2.67; // normalize to [-1, 1]
+          throttle_value = vars[1] / 10; // normalized to [-1, 1]. simulator coversion이 이게 확실하진 않음
+          
+          
+          // throttle_value = 0.3;
+          // steer_value = 0;
           
           json msgJson;
           // NOTE: Remember to divide by deg2rad(25) before you send the steering value back.
@@ -157,10 +170,9 @@ int main() {
           msgJson["throttle"] = throttle_value;
 
           //Display the MPC predicted trajectory 
-          vector<double> mpc_x_vals;
-          vector<double> mpc_y_vals;
-          mpc_x_vals = {0,3,5,7,9,12};
-          mpc_y_vals = {0,0,0,0,0,0};
+          vector<double> mpc_x_vals(mpc.pred_x.size());
+          vector<double> mpc_y_vals(mpc.pred_y.size());
+          glob_to_local(mpc.pred_x, mpc.pred_y, psi, px, py, mpc_x_vals, mpc_y_vals);
 
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Green line
@@ -171,6 +183,11 @@ int main() {
           //Display the waypoints/reference line
           vector<double> next_x_vals (ptsx.size());
           vector<double> next_y_vals (ptsy.size());
+          
+          vector<double> poly_y_vals (ptsy.size());
+          polyeval_vec(ptsx, ptsy, coeffs, poly_y_vals);
+          // glob_to_local(ptsx, poly_y_vals, psi, px, py, next_x_vals, next_y_vals);
+
           glob_to_local(ptsx, ptsy, psi, px, py, next_x_vals, next_y_vals);
 
 
@@ -182,7 +199,7 @@ int main() {
 
 
           auto msg = "42[\"steer\"," + msgJson.dump() + "]";
-          std::cout << msg << std::endl;
+          // std::cout << msg << std::endl;
           // Latency
           // The purpose is to mimic real driving conditions where
           // the car does actuate the commands instantly.
@@ -192,7 +209,7 @@ int main() {
           //
           // NOTE: REMEMBER TO SET THIS TO 100 MILLISECONDS BEFORE
           // SUBMITTING.
-          this_thread::sleep_for(chrono::milliseconds(100));
+          this_thread::sleep_for(chrono::milliseconds(0));
           ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
         }
       } else {
