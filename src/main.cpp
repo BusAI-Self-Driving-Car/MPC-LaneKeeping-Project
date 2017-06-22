@@ -65,16 +65,16 @@ Eigen::VectorXd polyfit(Eigen::VectorXd xvals, Eigen::VectorXd yvals,
   return result;
 }
 
-void glob_to_local(vector<double> x_glob, vector<double> y_glob, 
+void glob_to_local(Eigen::VectorXd x_glob, Eigen::VectorXd y_glob, 
                    double psi, double px, double py, 
-                   vector<double> &x_local, vector<double> &y_local){
+                   Eigen::VectorXd &x_local, Eigen::VectorXd &y_local){
   
   double cc = cos(psi);
   double ss = sin(psi);
   double x_local_, y_local_;
   double x_diff_glob, y_diff_glob;
 
-  for(size_t i=0; i<x_glob.size(); i++){
+  for(int i=0; i<x_glob.size(); i++){
     x_diff_glob = x_glob[i] - px;
     y_diff_glob = y_glob[i] - py;
 
@@ -88,13 +88,15 @@ void glob_to_local(vector<double> x_glob, vector<double> y_glob,
 
 }
 
-void polyeval_vec(vector<double> ptsx, vector<double> ptsy, 
-                  Eigen::VectorXd coeffs, vector<double> &ptsy_poly){
+void polyeval_vec(Eigen::VectorXd ptsx, Eigen::VectorXd coeffs, 
+                  vector<double> &ptsx_poly, vector<double> &ptsy_poly){
   double px, py;
-  for(size_t i=0; i<ptsx.size(); i++){
+  for(int i=0; i<ptsx.size(); i++){
     px = ptsx[i];
+    ptsx_poly[i] = px; // x
+
     py = polyeval(coeffs, px);
-    ptsy_poly[i] = py;
+    ptsy_poly[i] = py; // y
   }
 }
 
@@ -125,43 +127,38 @@ int main() {
           double psi = j[1]["psi"];
           double v = j[1]["speed"];
 
-          std::cout << "px: " << px << std::endl;
-          std::cout << "py: " << py << std::endl;
-          std::cout << "psi: " << psi << std::endl;
-
           // The polynomial of lane center
           // cast std::vector to Eigen::VectorXd
           double* ptsx_ptr = &ptsx[0];
-          double* ptsy_ptr = &ptsy[0];
           Eigen::Map<Eigen::VectorXd> ptsx_(ptsx_ptr, ptsx.size());
+          
+          double* ptsy_ptr = &ptsy[0];
           Eigen::Map<Eigen::VectorXd> ptsy_(ptsy_ptr, ptsy.size());
 
-          auto coeffs = polyfit(ptsx_, ptsy_, 3);
+          Eigen::VectorXd ptsx_local(ptsx.size());
+          Eigen::VectorXd ptsy_local(ptsy.size());
+          glob_to_local(ptsx_, ptsy_, psi, px, py, ptsx_local, ptsy_local);
+
+          auto coeffs = polyfit(ptsx_local, ptsy_local, 3);
 
           // state: cte, epsi
-          double cte = polyeval(coeffs, px) - py;
-          double epsi = psi - atan(coeffs[1] + 2* coeffs[2] * px + 3*coeffs[3] * px * px);
+          double cte = polyeval(coeffs, 0);
+          double epsi = - atan(coeffs[1]);
 
           Eigen::VectorXd state(6);
-          state << px, py, psi, v, cte, epsi;
+          state << 0, 0, 0, v, cte, epsi;
 
           auto vars = mpc.Solve(state, coeffs);
 
-          /*
-          * TODO: Calculate steering angle and throttle using MPC.
-          *
-          * Both are in between [-1, 1].
-          *
-          */
           double steer_value;
           double throttle_value;
 
           steer_value = - vars[0] / 2.67; // normalize to [-1, 1]
-          throttle_value = vars[1] / 10; // normalized to [-1, 1]. simulator coversion이 이게 확실하진 않음
-          
-          
-          // throttle_value = 0.3;
-          // steer_value = 0;
+          if(vars[1] >= 0){
+            throttle_value = vars[1] / 5;
+          }else{
+            throttle_value = vars[1] / 12;
+          }
           
           json msgJson;
           // NOTE: Remember to divide by deg2rad(25) before you send the steering value back.
@@ -172,7 +169,9 @@ int main() {
           //Display the MPC predicted trajectory 
           vector<double> mpc_x_vals(mpc.pred_x.size());
           vector<double> mpc_y_vals(mpc.pred_y.size());
-          glob_to_local(mpc.pred_x, mpc.pred_y, psi, px, py, mpc_x_vals, mpc_y_vals);
+          // glob_to_local(mpc.pred_x, mpc.pred_y, psi, px, py, mpc_x_vals, mpc_y_vals);
+          mpc_x_vals = mpc.pred_x;
+          mpc_y_vals = mpc.pred_y;
 
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Green line
@@ -183,12 +182,8 @@ int main() {
           //Display the waypoints/reference line
           vector<double> next_x_vals (ptsx.size());
           vector<double> next_y_vals (ptsy.size());
-          
-          vector<double> poly_y_vals (ptsy.size());
-          polyeval_vec(ptsx, ptsy, coeffs, poly_y_vals);
-          // glob_to_local(ptsx, poly_y_vals, psi, px, py, next_x_vals, next_y_vals);
-
-          glob_to_local(ptsx, ptsy, psi, px, py, next_x_vals, next_y_vals);
+        
+          polyeval_vec(ptsx_local, coeffs, next_x_vals, next_y_vals);
 
 
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system

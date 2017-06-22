@@ -9,11 +9,12 @@ using CppAD::AD;
 // double rad2deg(double x) { return x * 180 / pi(); }
 
 // TODO: Set the timestep length and duration
-size_t N = 40;
+size_t N = 20;
 double dt = 0.05;
 
 // set reference speed
-double ref_v = 10;
+double mph2mps = 0.44704; // mile/hour to m/s
+double ref_v = 100 * mph2mps;
 
 // start index 설정(vars)
 // int x_start, y_start, psi_start, v_start, cte_start, epsi_start; // state
@@ -55,15 +56,17 @@ class FG_eval {
     fg[0] = 0;
 
     // weight for cost function
-    double w_cte = 10;
-    double w_epsi = 1;
-    double w_v = 1;
+    double w_cte = 100;
+    double w_epsi = 1000;
+    double w_v = 0.01;
 
-    double w_delta = 1;
+    double w_delta = 0.1;
     double w_a = 0;
 
     double w_delta_diff = 0.5;
     double w_a_diff = 1;
+
+    double w_epsi_term = 3000;
 
     //**** cost function ****//
     // reference state
@@ -83,6 +86,11 @@ class FG_eval {
     for(size_t h = 0; h<N-2; h++){
       fg[0] += CppAD::pow(vars[delta_start + h + 1] - vars[delta_start + h], 2) * w_delta_diff;
       fg[0] += CppAD::pow(vars[a_start + h + 1] - vars[a_start + h], 2) * w_a_diff;
+    }
+
+    // terminal cost for heading
+    for(size_t h=N-3; h<N; h++){
+      fg[0] += CppAD::pow(vars[epsi_start + h], 2) * w_epsi_term;
     }
 
     // **** equality constraint (vehicle model) **** //
@@ -188,7 +196,7 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   vars[x_start] = x;
   vars[y_start] = y;
   vars[psi_start] = psi;
-  vars[v_start] = v;
+  vars[v_start] = v * mph2mps;
   vars[cte_start] = cte;
   vars[epsi_start] = epsi;
 
@@ -196,7 +204,6 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   Dvector vars_upperbound(n_vars);
   // TODO: Set lower and upper limits for variables.
   double delta_limit = 25 * 3.141592 / 180.0; // rad 25
-  double a_limit = 3.0; // m/s^2
 
   // state boundary
   for (size_t i=0; i<delta_start; i++){
@@ -206,14 +213,14 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
 
   // delta boundary
   for (size_t i=delta_start; i<a_start; i++){
-    vars_lowerbound[i] = - delta_limit;
-    vars_upperbound[i] = delta_limit;
+    vars_lowerbound[i] = - delta_limit * Lf;
+    vars_upperbound[i] = delta_limit * Lf;
   }
 
   // accel, decel boundary
   for (size_t i=a_start; i<n_vars; i++){
-    vars_lowerbound[i] = -a_limit;
-    vars_upperbound[i] = a_limit; // constant acceleartion
+    vars_lowerbound[i] = -12;
+    vars_upperbound[i] = 5; // constant acceleartion
   }
 
   // Lower and upper limits for the constraints
@@ -277,6 +284,8 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   std::cout << "Cost " << cost << std::endl;
   std::cout << "cte: " << state[4] << std::endl;
   std::cout << "epsi: " << state[5] << std::endl;
+  std::cout << "v: " << v << std::endl;
+  std::cout << "steering: " << solution.x[delta_start] << ", throttle: " << solution.x[a_start] << std::endl;
 
   // TODO: Return the first actuator values. The variables can be accessed with
   // `solution.x[i]`.
