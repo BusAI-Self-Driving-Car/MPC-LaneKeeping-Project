@@ -1,9 +1,114 @@
-# CarND-Controls-MPC
-Self-Driving Car Engineer Nanodegree Program
+# MPC Lane Keeping Project
+[![Udacity - Self-Driving Car NanoDegree](https://s3.amazonaws.com/udacity-sdc/github/shield-carnd.svg)](http://www.udacity.com/drive)
 
+Udacity Self-Driving Car Engineer Nanodegree Program
+* Objective: Make self-driving car **keep lane** by using both `steering` and `throttle(brake)`.
+* Method: Model Predictive Control(MPC)
+  * Number of Horizon (N): `20`
+  * Elapsed Duration (dt): `50 ms`
+
+Result
+---
+If you want to see full version video, click [`Youtube link`](https://youtu.be/lvGuNVJdAKU). 
+The vehicle was able to run without leaving the lane at maximum speed `100 mph (160 km/h)` with `100 ms` latency.
+<p align="center">
+  <img src="./img/mpc_8mb.gif">
+  <img src="./img/sim_result.png">
+</p>
+
+Vehicle Models and MPC Implementation
+---
+### Vehicle Model
+
+* Model : **Kinematic** based vehicle model. This dose not consider dynamics such as slip angle and slip ratio. States of the vehicle model can be divided into **vehicle states** and **error states**.
+* Vehicle States: [x, y, psi, v] where `x`, `y` is vehicle position in vehicle's coordinates, `psi` is yaw angle and `v` is velocity.
+* Error States: [cte, epsi] where `cte` is cross track error and `epsi` is heading error. It uses `f(x)`, which is a polynomial fitted to waypoints.
+
+So, basic version of vehicle model is as follow:
+```
+  x[t+1] = x[t] + v[t] * cos(psi[t]) * dt
+  y[t+1] = y[t] + v[t] * sin(psi[t]) * dt
+  psi[t+1] = psi[t] + v[t] / Lf * delta[t] * dt
+  v[t+1] = v[t] + a[t] * dt
+  cte[t+1] = f(x[t]) - y[t] + v[t] * sin(epsi[t]) * dt
+  epsi[t+1] = psi[t] - psides[t] + v[t] * delta[t] / Lf * dt
+```
+
+### MPC Implementation
+#### Cost
+* `Reference states`: minimize error to referenece states. (cte = 0, epsi = 0, v = ref_v)
+* `Use of actuator`: minimize the use of actuator.
+* `Value gap between sequential actuation`: minimize the value gap. This helps the vehicle move smoothly.
+* `Terminal heading error`: minimize the heading error at last of the horizon(N). This helps the vehicle move more stable.
+
+```
+  //**** cost function ****//
+  fg[0] = 0;
+
+  // reference state
+  for(size_t h = 0; h < N; h++){
+    fg[0] += CppAD::pow(vars[cte_start + h], 2) * w_cte;
+    fg[0] += CppAD::pow(vars[epsi_start + h], 2) * w_epsi;
+    fg[0] += CppAD::pow(vars[v_start + h] - ref_v, 2) * w_v;
+  }
+
+  // minimize the use of actuator
+  for(size_t h = 0; h < N-1; h++){
+    fg[0] += CppAD::pow(vars[delta_start + h], 2) * w_delta;
+    fg[0] += CppAD::pow(vars[a_start + h], 2) * w_a;
+  }
+
+  // minimize the value gap between sequential actuations
+  for(size_t h = 0; h < N-2; h++){
+    fg[0] += CppAD::pow(vars[delta_start + h + 1] - vars[delta_start + h], 2) * w_delta_diff;
+    fg[0] += CppAD::pow(vars[a_start + h + 1] - vars[a_start + h], 2) * w_a_diff;
+  }
+
+  // terminal cost for heading
+  for(size_t h = N-3; h < N; h++){
+    fg[0] += CppAD::pow(vars[epsi_start + h], 2) * w_epsi_term;
+  }
+```
+
+#### Constraints
+* Only consider actuator limits (`steering` and `throttle`)
+
+### Latency issue
+#### Problem
+* 100 millisecond latency deteriorates control performance.
+
+#### Solution  
+1. **Look-ahead distance:** 
+One of the simple solution is to control the vehicle with look-ahead distance. Just like a real person driving, seeing far away helps the system to ensure stability. I designed MPC to minimize cte from look-ahead distance, not from 0 in x-direction. This method *indirectly* reduces problems caused by latency, but it is not a fundamental solution.
+```
+  // set look-ahead distance
+  double d_ahead = v * 0.15; 
+
+  // cte at look-ahead distance
+  double cte = polyeval(coeffs, d_ahead);
+```
+2. **Explicitly model latency on MPC formulation:**
+This is *direct* method to deal with latency problem. We can explicitly model 100ms latency on MPC formulation. As `dt` is 50ms, the control inputs at `t` affects all states at `t+2`. So the basic version of vehicle model can change as follow.
+```
+  x[t+3] = x[t+2] + v[t+2] * cos(psi[t+2]) * dt
+  y[t+3] = y[t+2] + v[t+2] * sin(psi[t+2]) * dt
+  psi[t+3] = psi[t+2] + v[t+2] / Lf * delta[t] * dt
+  v[t+3] = v[t+2] + a[t] * dt
+  cte[t+3] = f(x[t+2]) - y[t+2] + v[t+2] * sin(epsi[t+2]) * dt
+  epsi[t+3] = psi[t+2] - psides[t+2] + v[t+2] * delta[t] / Lf * dt
+```
+Please pay attention that `a[t]` and `delta[t]` updates states at `t+2`
+
+Basic Build Instructions
 ---
 
-## Dependencies
+1. Clone this repo.
+2. Make a build directory: `mkdir build && cd build`
+3. Compile: `cmake .. && make`
+4. Run it: `./mpc`.
+
+Dependencies
+---
 
 * cmake >= 3.5
  * All OSes: [click here for installation instructions](https://cmake.org/install/)
@@ -40,76 +145,3 @@ Self-Driving Car Engineer Nanodegree Program
 * [Eigen](http://eigen.tuxfamily.org/index.php?title=Main_Page). This is already part of the repo so you shouldn't have to worry about it.
 * Simulator. You can download these from the [releases tab](https://github.com/udacity/self-driving-car-sim/releases).
 * Not a dependency but read the [DATA.md](./DATA.md) for a description of the data sent back from the simulator.
-
-
-## Basic Build Instructions
-
-
-1. Clone this repo.
-2. Make a build directory: `mkdir build && cd build`
-3. Compile: `cmake .. && make`
-4. Run it: `./mpc`.
-
-## Tips
-
-1. It's recommended to test the MPC on basic examples to see if your implementation behaves as desired. One possible example
-is the vehicle starting offset of a straight line (reference). If the MPC implementation is correct, after some number of timesteps
-(not too many) it should find and track the reference line.
-2. The `lake_track_waypoints.csv` file has the waypoints of the lake track. You could use this to fit polynomials and points and see of how well your model tracks curve. NOTE: This file might be not completely in sync with the simulator so your solution should NOT depend on it.
-3. For visualization this C++ [matplotlib wrapper](https://github.com/lava/matplotlib-cpp) could be helpful.
-
-## Editor Settings
-
-We've purposefully kept editor configuration files out of this repo in order to
-keep it as simple and environment agnostic as possible. However, we recommend
-using the following settings:
-
-* indent using spaces
-* set tab width to 2 spaces (keeps the matrices in source code aligned)
-
-## Code Style
-
-Please (do your best to) stick to [Google's C++ style guide](https://google.github.io/styleguide/cppguide.html).
-
-## Project Instructions and Rubric
-
-Note: regardless of the changes you make, your project must be buildable using
-cmake and make!
-
-More information is only accessible by people who are already enrolled in Term 2
-of CarND. If you are enrolled, see [the project page](https://classroom.udacity.com/nanodegrees/nd013/parts/40f38239-66b6-46ec-ae68-03afd8a601c8/modules/f1820894-8322-4bb3-81aa-b26b3c6dcbaf/lessons/b1ff3be0-c904-438e-aad3-2b5379f0e0c3/concepts/1a2255a0-e23c-44cf-8d41-39b8a3c8264a)
-for instructions and the project rubric.
-
-## Hints!
-
-* You don't have to follow this directory structure, but if you do, your work
-  will span all of the .cpp files here. Keep an eye out for TODOs.
-
-## Call for IDE Profiles Pull Requests
-
-Help your fellow students!
-
-We decided to create Makefiles with cmake to keep this project as platform
-agnostic as possible. Similarly, we omitted IDE profiles in order to we ensure
-that students don't feel pressured to use one IDE or another.
-
-However! I'd love to help people get up and running with their IDEs of choice.
-If you've created a profile for an IDE that you think other students would
-appreciate, we'd love to have you add the requisite profile files and
-instructions to ide_profiles/. For example if you wanted to add a VS Code
-profile, you'd add:
-
-* /ide_profiles/vscode/.vscode
-* /ide_profiles/vscode/README.md
-
-The README should explain what the profile does, how to take advantage of it,
-and how to install it.
-
-Frankly, I've never been involved in a project with multiple IDE profiles
-before. I believe the best way to handle this would be to keep them out of the
-repo root to avoid clutter. My expectation is that most profiles will include
-instructions to copy files to a new location to get picked up by the IDE, but
-that's just a guess.
-
-One last note here: regardless of the IDE used, every submitted project must
-still be compilable with cmake and make./

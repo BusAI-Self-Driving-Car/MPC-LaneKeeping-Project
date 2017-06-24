@@ -152,11 +152,12 @@ int main() {
           // get third order polynomial lane parameters
           auto coeffs = polyfit(ptsx_local, ptsy_local, 3);
 
-          // set lookahead distance
+          // set look-ahead distance
           double d_ahead = v * 0.15; 
 
-          // state: cte, epsi
+          // cte at look-ahead distance
           double cte = polyeval(coeffs, d_ahead);
+          
           double epsi = - atan(coeffs[1]);
 
           Eigen::VectorXd state(6+2);

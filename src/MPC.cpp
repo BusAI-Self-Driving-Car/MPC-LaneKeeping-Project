@@ -79,8 +79,6 @@ class FG_eval {
       fg[0] += CppAD::pow(vars[epsi_start + h], 2) * w_epsi;
       fg[0] += CppAD::pow(vars[v_start + h] - ref_v, 2) * w_v;
     }
-    
-    
 
     // minimize the use of actuator
     for(size_t h = 0; h < N-1; h++){
