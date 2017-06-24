@@ -302,12 +302,12 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
 
   // Cost
   auto cost = solution.obj_value;
-  std::cout << "-----------------------------" << std::endl;
-  std::cout << "Cost " << cost << std::endl;
-  std::cout << "cte: " << state[4] << std::endl;
-  std::cout << "epsi: " << state[5] << std::endl;
-  std::cout << "v: " << v << std::endl;
-  std::cout << "steering: " << solution.x[delta_start] << ", throttle: " << solution.x[a_start] << std::endl;
+  // std::cout << "-----------------------------" << std::endl;
+  // std::cout << "Cost " << cost << std::endl;
+  // std::cout << "cte: " << state[4] << std::endl;
+  // std::cout << "epsi: " << state[5] << std::endl;
+  // std::cout << "v: " << v << std::endl;
+  // std::cout << "steering: " << solution.x[delta_start] << ", throttle: " << solution.x[a_start] << std::endl;
 
   // TODO: Return the first actuator values. The variables can be accessed with
   // `solution.x[i]`.

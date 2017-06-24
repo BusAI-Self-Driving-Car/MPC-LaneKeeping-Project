@@ -129,9 +129,6 @@ int main() {
           double steering_angle = j[1]["steering_angle"];
           double throttle = j[1]["throttle"];
 
-          std::cout << "!!! steering angle : " << steering_angle << std::endl;
-          std::cout << "!!! throttle : " << throttle << std::endl;
-
           double throttle_real;
           if (throttle > 0){
             throttle_real = throttle * 5;
